@@ -8,10 +8,13 @@ const adminRoutes = require('./routes/adminRoutes');
 const bookRoutes = require('./routes/bookRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+
+// Sử dụng port từ Render cấp hoặc mặc định là 10000 nếu chạy local
+const PORT = process.env.PORT || 10000;
 
 // Middleware
-app.use(cors()); // Cho phép tất cả các nguồn trong quá trình phát triển (development)
+// Khi đã deploy xong, bạn có thể thay cors() thành cors({ origin: 'link-vercel-cua-ban' }) để bảo mật
+app.use(cors()); 
 app.use(express.json());
 
 // Routes
@@ -20,12 +23,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/books', bookRoutes);
 
-// Test route
+// Test route - Giúp bạn kiểm tra nhanh link Render có sống hay không
 app.get('/', (req, res) => {
-  res.send('API is running...');
+  res.send('API Backend của Tuấn Anh đang chạy thành công rực rỡ!');
 });
 
-app.listen(PORT, () => {
+// Quan trọng: Thêm '0.0.0.0' để Render có thể bind vào cổng thành công
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server đang chạy thành công trên port ${PORT}`);
-  console.log(`📚 Link kiểm tra dữ liệu sách: http://localhost:${PORT}/api/books`);
 });
