@@ -1,0 +1,19 @@
+# Thư mục chứa các package đã cài đặt từ npm/yarn
+/node_modules
+
+# File chứa các biến môi trường và thông tin nhạy cảm
+# Rất quan trọng để không đưa file này lên GitHub
+.env
+
+# Files log
+logs
+*.log
+npm-debug.log*
+
+# Files hệ thống của OS
+.DS_Store
+Thumbs.db
+
+# Thư mục cấu hình của các IDE/Editor
+.idea/
+.vscode/
