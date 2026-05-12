@@ -56,8 +56,8 @@ const authController = {
         // Lưu Refresh Token vào HTTP-Only Cookie
         res.cookie('refreshToken', refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production', // Chỉ gửi qua HTTPS khi deploy
-          sameSite: 'strict',
+          secure: true, // Bắt buộc phải true khi sameSite=None (vì dùng HTTPS)
+          sameSite: 'none', // Cho phép gửi cookie cross-site (từ Render tới Vercel)
           maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ngày
         });
 
