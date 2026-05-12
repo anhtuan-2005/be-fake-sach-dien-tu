@@ -12,6 +12,7 @@
     "deploy": "npm run migrate:up && npm start"
   },
   "dependencies": {
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "db-migrate": "^0.11.14",
     "db-migrate-mysql": "^2.3.1",

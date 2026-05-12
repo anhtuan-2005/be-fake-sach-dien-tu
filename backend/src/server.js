@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const userRoutes = require('./routes/userRoutes');
@@ -13,9 +14,12 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // Middleware
-// Khi đã deploy xong, bạn có thể thay cors() thành cors({ origin: 'link-vercel-cua-ban' }) để bảo mật
-app.use(cors()); 
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Địa chỉ frontend của bạn
+  credentials: true // Cho phép gửi cookie
+})); 
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/users', userRoutes);
