@@ -1,5 +1,7 @@
 # Thư mục chứa các package đã cài đặt từ npm/yarn
 /node_modules
+/dist
+*.tsbuildinfo
 
 # File chứa các biến môi trường và thông tin nhạy cảm
 # Rất quan trọng để không đưa file này lên GitHub
