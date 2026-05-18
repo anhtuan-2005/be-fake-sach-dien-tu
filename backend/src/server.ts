@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes';
 import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import bookRoutes from './routes/bookRoutes';
+import { setupLogCleanupJob } from './jobs/logCleanup';
 
 dotenv.config();
 
@@ -40,6 +41,9 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Kích hoạt Cron Jobs
+setupLogCleanupJob();
 
 // Routes
 app.use('/api/users', userRoutes);

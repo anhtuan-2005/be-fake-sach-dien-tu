@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from '../models/userModel';
 import { ApiResponse, User as UserInterface } from '../types';
+import { createActivityLog } from '../utils/logger';
 
 /**
  * Controller quản lý các logic nghiệp vụ liên quan đến người dùng
@@ -14,7 +15,37 @@ const userController = {
    */
   getUsers: async (req: Request, res: Response): Promise<void> => {
     try {
-      const users: UserInterface[] = await User.getAll();
+      console.log('>>> userController: Received request for getUsers');
+      console.log('>>> Query Params:', JSON.stringify(req.query, null, 2));
+      
+      // Tiếp nhận Query Parameters từ URL
+      const { 
+        role, 
+        level, 
+        province, 
+        district, 
+        school, 
+        phone, 
+        email,
+        showDeleted // Thêm flag để lấy danh sách đã xóa
+      } = req.query;
+
+      const filters = {
+        role: role as string,
+        level: level as string,
+        province: province as string,
+        district: district as string,
+        school: school as string,
+        phone: phone as string,
+        email: email as string
+      };
+
+      const isTrash = (showDeleted as string) === 'true';
+
+      // Gọi model search với các bộ lọc
+      const users: UserInterface[] = await User.search(filters, isTrash);
+      
+      console.log(`>>> userController: Successfully fetched ${users.length} users (Trash: ${isTrash})`);
       
       const response: ApiResponse<UserInterface[]> = {
         success: true,
@@ -23,15 +54,204 @@ const userController = {
       
       res.status(200).json(response);
     } catch (error: unknown) {
-      console.error('Error fetching users:', error);
+      console.error('>>> CRITICAL ERROR in userController.getUsers:', error);
       
       const response: ApiResponse = {
         success: false,
-        message: 'Lỗi khi lấy danh sách người dùng',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        message: 'Lỗi server khi lấy danh sách người dùng',
+        error: error instanceof Error ? error.message : 'Unknown internal server error'
       };
       
       res.status(500).json(response);
+    }
+  },
+
+  /**
+   * Tạo người dùng mới
+   */
+  createUser: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userData = req.body;
+      const insertId = await User.create(userData);
+      
+      // Ghi log hoạt động
+      await createActivityLog({
+        userId: req.user?.id,
+        userEmail: req.user?.email,
+        action: 'CREATE',
+        targetUserId: insertId,
+        description: `Tạo người dùng mới: ${userData.full_name}`,
+        newValues: userData,
+        ipAddress: req.ip
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Tạo người dùng thành công',
+        data: { id: insertId }
+      });
+    } catch (error: any) {
+      console.error('>>> userController: Error creating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi tạo người dùng',
+        error: error.message
+      });
+    }
+  },
+
+  /**
+   * Cập nhật người dùng
+   */
+  updateUser: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id: idParam } = req.params;
+      const id = parseInt(idParam as string);
+      const userData = req.body;
+      
+      // 1. Kiểm tra người dùng có tồn tại không
+      const oldUser = await User.getById(id);
+      if (!oldUser) {
+        res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng để cập nhật'
+        });
+        return;
+      }
+      
+      // 2. Thực hiện cập nhật
+      const success = await User.update(id, userData);
+      
+      // 3. Ghi log hoạt động (Ghi log ngay cả khi success là false do không có gì thay đổi, 
+      // nhưng thực tế User.update trả về true nếu query thành công trong một số trường hợp, 
+      // hoặc chúng ta coi việc bấm Save là một thao tác cần ghi nhận)
+      await createActivityLog({
+        userId: req.user?.id,
+        userEmail: req.user?.email,
+        action: 'UPDATE',
+        targetUserId: id,
+        description: `Cập nhật thông tin người dùng: ${oldUser.full_name}`,
+        oldValues: oldUser,
+        newValues: userData,
+        ipAddress: req.ip
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Cập nhật người dùng thành công'
+      });
+    } catch (error: any) {
+      console.error('>>> userController: Error updating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi cập nhật người dùng',
+        error: error.message
+      });
+    }
+  },
+
+  /**
+   * Xóa mềm người dùng
+   */
+  softDeleteUser: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = parseInt(id as string);
+
+      if (req.user && req.user.id === userId) {
+        res.status(403).json({
+          success: false,
+          message: 'Bạn không thể tự xóa tài khoản của chính mình'
+        });
+        return;
+      }
+
+      // 1. Kiểm tra tồn tại
+      const oldUser = await User.getById(userId);
+      if (!oldUser) {
+        res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng để xóa'
+        });
+        return;
+      }
+
+      // 2. Thực hiện xóa mềm
+      const success = await User.softDelete(userId);
+      if (success) {
+        // 3. Ghi log hoạt động
+        await createActivityLog({
+          userId: req.user?.id,
+          userEmail: req.user?.email,
+          action: 'DELETE',
+          targetUserId: userId,
+          description: `Xóa mềm người dùng: ${oldUser.full_name}`,
+          oldValues: oldUser,
+          ipAddress: req.ip
+        });
+
+        res.status(200).json({
+          success: true,
+          message: 'Đã chuyển người dùng vào thùng rác'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa người dùng'
+        });
+      }
+    } catch (error: any) {
+      console.error('>>> userController: Error soft deleting user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi xóa người dùng',
+        error: error.message
+      });
+    }
+  },
+
+  /**
+   * Khôi phục người dùng
+   */
+  restoreUser: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = parseInt(id as string);
+      
+      const success = await User.restore(userId);
+      
+      if (success) {
+        // Lấy lại data sau khi khôi phục để ghi log
+        const restoredUser = await User.getById(userId);
+        
+        // Ghi log hoạt động
+        await createActivityLog({
+          userId: req.user?.id,
+          userEmail: req.user?.email,
+          action: 'UPDATE', // Khôi phục cũng là một dạng update trạng thái
+          targetUserId: userId,
+          description: `Khôi phục người dùng: ${restoredUser?.full_name || id}`,
+          newValues: restoredUser,
+          ipAddress: req.ip
+        });
+
+        res.status(200).json({
+          success: true,
+          message: 'Khôi phục người dùng thành công'
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng'
+        });
+      }
+    } catch (error: any) {
+      console.error('>>> userController: Error restoring user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi khôi phục người dùng',
+        error: error.message
+      });
     }
   },
 
