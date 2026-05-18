@@ -41,21 +41,24 @@ const User = {
   },
 
   /**
-   * Tìm kiếm và lọc người dùng nâng cao
+   * Tìm kiếm và lọc người dùng nâng cao với phân trang
    * @param filters Các tiêu chí lọc
    * @param showDeleted Có lấy cả người dùng đã xóa mềm hay không
+   * @param page Trang hiện tại
+   * @param limit Số lượng bản ghi mỗi trang
    */
-  search: async (filters: any, showDeleted: boolean = false): Promise<UserInterface[]> => {
+  search: async (filters: any, showDeleted: boolean = false, page: number = 1, limit: number = 10): Promise<{ users: UserInterface[], total: number }> => {
     try {
-      console.log('>>> UserModel: Received filters:', filters, 'showDeleted:', showDeleted);
-      let query = 'SELECT * FROM users WHERE 1=1';
+      console.log('>>> UserModel: Received filters:', filters, 'showDeleted:', showDeleted, 'page:', page, 'limit:', limit);
+      
+      let baseQuery = ' FROM users WHERE 1=1';
       const queryParams: any[] = [];
 
       // Mặc định chỉ lấy người chưa xóa mềm
       if (!showDeleted) {
-        query += ' AND deleted_at IS NULL';
+        baseQuery += ' AND deleted_at IS NULL';
       } else {
-        query += ' AND deleted_at IS NOT NULL';
+        baseQuery += ' AND deleted_at IS NOT NULL';
       }
 
       // 1. Mapping role từ FE sang DB (Tiếng Việt)
@@ -65,55 +68,66 @@ const User = {
       if (roleValue === 'STUDENT') roleValue = 'Học sinh';
 
       if (roleValue && roleValue !== 'all') {
-        query += ' AND account_type = ?';
+        baseQuery += ' AND account_type = ?';
         queryParams.push(roleValue);
       }
 
       // 2. Lọc theo Cấp
       if (filters.level && filters.level !== 'all') {
-        query += ' AND level = ?';
+        baseQuery += ' AND level = ?';
         queryParams.push(filters.level);
       }
 
       // 3. Lọc theo Tỉnh/Thành phố
       if (filters.province && filters.province !== 'all') {
-        query += ' AND province_id = ?';
+        baseQuery += ' AND province_id = ?';
         queryParams.push(filters.province);
       }
 
       // 4. Lọc theo Xã/Phường
       if (filters.district && filters.district !== 'all') {
-        query += ' AND ward_id = ?';
+        baseQuery += ' AND ward_id = ?';
         queryParams.push(filters.district);
       }
 
       // 5. Lọc theo Trường học
       if (filters.school && filters.school.trim() !== '') {
-        query += ' AND school_name LIKE ?';
+        baseQuery += ' AND school_name LIKE ?';
         queryParams.push(`%${filters.school}%`);
       }
 
       // 6. Lọc theo Số điện thoại
       if (filters.phone && filters.phone.trim() !== '') {
-        query += ' AND phone LIKE ?';
+        baseQuery += ' AND phone LIKE ?';
         queryParams.push(`%${filters.phone}%`);
       }
 
       // 7. Lọc theo Email
       if (filters.email && filters.email.trim() !== '') {
-        query += ' AND email LIKE ?';
+        baseQuery += ' AND email LIKE ?';
         queryParams.push(`%${filters.email}%`);
       }
 
-      query += ' ORDER BY created_at DESC';
+      // Đếm tổng số bản ghi
+      const countQuery = 'SELECT COUNT(*) as total' + baseQuery;
+      const [countResult] = await db.query<RowDataPacket[]>(countQuery, queryParams);
+      const total = countResult[0].total;
+
+      // Lấy dữ liệu phân trang
+      const offset = (page - 1) * limit;
+      const dataQuery = 'SELECT *' + baseQuery + ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      const dataParams = [...queryParams, limit, offset];
 
       console.log('--- SQL QUERY EXECUTION ---');
-      console.log('SQL:', query);
-      console.log('PARAMS:', JSON.stringify(queryParams));
+      console.log('Data SQL:', dataQuery);
+      console.log('Params:', JSON.stringify(dataParams));
       console.log('---------------------------');
 
-      const [rows] = await db.query<RowDataPacket[]>(query, queryParams);
-      return rows as UserInterface[];
+      const [rows] = await db.query<RowDataPacket[]>(dataQuery, dataParams);
+      return {
+        users: rows as UserInterface[],
+        total
+      };
     } catch (error: unknown) {
       console.error('>>> UserModel Search Error:', error);
       if (error instanceof Error) {
