@@ -43,12 +43,19 @@ const authController = {
     const { email, password }: LoginDto = req.body;
 
     try {
+      // Kiểm tra trong database trước
+      const user = await User.findByEmail(email);
+      
       let userData: UserInterface | null = null;
 
-      // 1. Kiểm tra tài khoản test cố định
-      if (email === 'testitdn@gmail.com' && password === 'sachso') {
+      // 1. Nếu tìm thấy user và mật khẩu khớp
+      if (user && user.password === password) {
+        userData = user;
+      } 
+      // 2. Dự phòng cho tài khoản test nếu DB chưa có (nhưng vẫn nên dùng ID hợp lệ nếu có thể)
+      else if (email === 'testitdn@gmail.com' && password === 'sachso') {
         userData = {
-          id: 0,
+          id: 1, // Giả định ID 1 cho admin test nếu không tìm thấy trong DB
           user_code: 'ADMIN',
           full_name: 'Người dùng Test',
           account_type: 'Admin',
@@ -63,13 +70,6 @@ const authController = {
           role: 'admin',
           created_at: new Date()
         };
-      } else {
-        // 2. Kiểm tra trong database
-        const user = await User.findByEmail(email);
-        // Lưu ý: Trong thực tế nên dùng bcrypt.compare
-        if (user && user.password === password) {
-          userData = user;
-        }
       }
 
       if (userData) {

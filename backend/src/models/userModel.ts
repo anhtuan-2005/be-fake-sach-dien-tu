@@ -39,6 +39,155 @@ const User = {
       throw new Error('Lỗi không xác định khi truy vấn database');
     }
   },
+
+  /**
+   * Tìm kiếm và lọc người dùng nâng cao
+   * @param filters Các tiêu chí lọc
+   * @param showDeleted Có lấy cả người dùng đã xóa mềm hay không
+   */
+  search: async (filters: any, showDeleted: boolean = false): Promise<UserInterface[]> => {
+    try {
+      console.log('>>> UserModel: Received filters:', filters, 'showDeleted:', showDeleted);
+      let query = 'SELECT * FROM users WHERE 1=1';
+      const queryParams: any[] = [];
+
+      // Mặc định chỉ lấy người chưa xóa mềm
+      if (!showDeleted) {
+        query += ' AND deleted_at IS NULL';
+      } else {
+        query += ' AND deleted_at IS NOT NULL';
+      }
+
+      // 1. Mapping role từ FE sang DB (Tiếng Việt)
+      let roleValue = filters.role;
+      if (roleValue === 'ADMIN') roleValue = 'Admin';
+      if (roleValue === 'TEACHER') roleValue = 'Giáo viên';
+      if (roleValue === 'STUDENT') roleValue = 'Học sinh';
+
+      if (roleValue && roleValue !== 'all') {
+        query += ' AND account_type = ?';
+        queryParams.push(roleValue);
+      }
+
+      // 2. Lọc theo Cấp
+      if (filters.level && filters.level !== 'all') {
+        query += ' AND level = ?';
+        queryParams.push(filters.level);
+      }
+
+      // 3. Lọc theo Tỉnh/Thành phố
+      if (filters.province && filters.province !== 'all') {
+        query += ' AND province_id = ?';
+        queryParams.push(filters.province);
+      }
+
+      // 4. Lọc theo Xã/Phường
+      if (filters.district && filters.district !== 'all') {
+        query += ' AND ward_id = ?';
+        queryParams.push(filters.district);
+      }
+
+      // 5. Lọc theo Trường học
+      if (filters.school && filters.school.trim() !== '') {
+        query += ' AND school_name LIKE ?';
+        queryParams.push(`%${filters.school}%`);
+      }
+
+      // 6. Lọc theo Số điện thoại
+      if (filters.phone && filters.phone.trim() !== '') {
+        query += ' AND phone LIKE ?';
+        queryParams.push(`%${filters.phone}%`);
+      }
+
+      // 7. Lọc theo Email
+      if (filters.email && filters.email.trim() !== '') {
+        query += ' AND email LIKE ?';
+        queryParams.push(`%${filters.email}%`);
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      console.log('--- SQL QUERY EXECUTION ---');
+      console.log('SQL:', query);
+      console.log('PARAMS:', JSON.stringify(queryParams));
+      console.log('---------------------------');
+
+      const [rows] = await db.query<RowDataPacket[]>(query, queryParams);
+      return rows as UserInterface[];
+    } catch (error: unknown) {
+      console.error('>>> UserModel Search Error:', error);
+      if (error instanceof Error) {
+        throw new Error(`Lỗi khi tìm kiếm người dùng: ${error.message}`);
+      }
+      throw new Error('Lỗi không xác định khi truy vấn database');
+    }
+  },
+
+  /**
+   * Tạo người dùng mới
+   */
+  create: async (userData: Partial<UserInterface>): Promise<number> => {
+    try {
+      const { full_name, email, phone, account_type, level, user_code, password } = userData;
+      const [result] = await db.query<any>(
+        'INSERT INTO users (full_name, email, phone, account_type, level, user_code, password, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+        [full_name, email, phone, account_type, level, user_code, password]
+      );
+      return result.insertId;
+    } catch (error: unknown) {
+      console.error('>>> UserModel Create Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cập nhật thông tin người dùng
+   */
+  update: async (id: number, userData: Partial<UserInterface>): Promise<boolean> => {
+    try {
+      const { full_name, email, phone, account_type, level, user_code } = userData;
+      const [result] = await db.query<any>(
+        'UPDATE users SET full_name = ?, email = ?, phone = ?, account_type = ?, level = ?, user_code = ? WHERE id = ?',
+        [full_name, email, phone, account_type, level, user_code, id]
+      );
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      console.error('>>> UserModel Update Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Xóa mềm người dùng
+   */
+  softDelete: async (id: number): Promise<boolean> => {
+    try {
+      const [result] = await db.query<any>(
+        'UPDATE users SET deleted_at = NOW() WHERE id = ?',
+        [id]
+      );
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      console.error('>>> UserModel SoftDelete Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Khôi phục người dùng đã xóa mềm
+   */
+  restore: async (id: number): Promise<boolean> => {
+    try {
+      const [result] = await db.query<any>(
+        'UPDATE users SET deleted_at = NULL WHERE id = ?',
+        [id]
+      );
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      console.error('>>> UserModel Restore Error:', error);
+      throw error;
+    }
+  },
   
   /**
    * Tìm kiếm người dùng theo email

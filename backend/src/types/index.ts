@@ -70,12 +70,31 @@ export interface School {
 /**
  * Interface cho Nhật ký hoạt động
  */
-export interface ActionLog {
+export interface ActivityLog {
   id: number;
   user_id: number | null;
-  action: string;
-  device: string | null;
-  created_at: Date;
+  user_email: string | null;
+  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE';
+  target_user_id: number | null;
+  description: string;
+  old_values: any | null;
+  new_values: any | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+/**
+ * Interface cho đầu vào log
+ */
+export interface LogInput {
+  userId?: number;
+  userEmail?: string;
+  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE';
+  targetUserId?: number;
+  description: string;
+  oldValues?: any;
+  newValues?: any;
+  ipAddress?: string;
 }
 
 /**
