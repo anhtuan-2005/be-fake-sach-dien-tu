@@ -8,7 +8,7 @@ import { createActivityLog } from '../utils/logger';
  */
 const userController = {
   /**
-   * Lấy danh sách toàn bộ người dùng
+   * Lấy danh sách toàn bộ người dùng với phân trang
    * @param {Request} req Express Request
    * @param {Response} res Express Response
    * @returns {Promise<void>}
@@ -27,7 +27,9 @@ const userController = {
         school, 
         phone, 
         email,
-        showDeleted // Thêm flag để lấy danh sách đã xóa
+        showDeleted,
+        page,
+        limit
       } = req.query;
 
       const filters = {
@@ -41,15 +43,23 @@ const userController = {
       };
 
       const isTrash = (showDeleted as string) === 'true';
+      const currentPage = parseInt(page as string) || 1;
+      const pageSize = parseInt(limit as string) || 10;
 
-      // Gọi model search với các bộ lọc
-      const users: UserInterface[] = await User.search(filters, isTrash);
+      // Gọi model search với các bộ lọc và phân trang
+      const { users, total } = await User.search(filters, isTrash, currentPage, pageSize);
       
       console.log(`>>> userController: Successfully fetched ${users.length} users (Trash: ${isTrash})`);
       
       const response: ApiResponse<UserInterface[]> = {
         success: true,
-        data: users
+        data: users,
+        pagination: {
+          currentPage,
+          totalPages: Math.ceil(total / pageSize),
+          totalItems: total,
+          itemsPerPage: pageSize
+        }
       };
       
       res.status(200).json(response);
@@ -172,6 +182,15 @@ const userController = {
         res.status(404).json({
           success: false,
           message: 'Không tìm thấy người dùng để xóa'
+        });
+        return;
+      }
+
+      // CHẶN XÓA ADMIN HỆ THỐNG
+      if (oldUser.email === 'testitdn@gmail.com') {
+        res.status(400).json({
+          success: false,
+          message: 'Không thể xóa tài khoản Admin tối cao của hệ thống!'
         });
         return;
       }

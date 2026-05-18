@@ -107,6 +107,16 @@ export interface JWTPayload {
 }
 
 /**
+ * Interface cho phân trang log
+ */
+export interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+}
+
+/**
  * Cấu trúc phản hồi chuẩn từ API
  */
 export interface ApiResponse<T = any> {
@@ -114,7 +124,12 @@ export interface ApiResponse<T = any> {
   message?: string;
   data?: T;
   error?: string;
+  pagination?: PaginationData;
 }
+
+/**
+ * Interface cho bộ lọc người dùng
+ */
 
 /**
  * Dữ liệu đăng nhập
