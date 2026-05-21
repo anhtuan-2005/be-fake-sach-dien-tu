@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import User from '../models/userModel';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
 import { ApiResponse, LoginDto, User as UserInterface, JWTPayload } from '../types';
 
 dotenv.config();
@@ -43,64 +44,54 @@ const authController = {
     const { email, password }: LoginDto = req.body;
 
     try {
-      // Kiểm tra trong database trước
+      // 1. Tìm kiếm user trong database theo email
       const user = await User.findByEmail(email);
       
-      let userData: UserInterface | null = null;
-
-      // 1. Nếu tìm thấy user và mật khẩu khớp
-      if (user && user.password === password) {
-        userData = user;
-      } 
-      // 2. Dự phòng cho tài khoản test nếu DB chưa có (nhưng vẫn nên dùng ID hợp lệ nếu có thể)
-      else if (email === 'testitdn@gmail.com' && password === 'sachso') {
-        userData = {
-          id: 1, // Giả định ID 1 cho admin test nếu không tìm thấy trong DB
-          user_code: 'ADMIN',
-          full_name: 'Người dùng Test',
-          account_type: 'Admin',
-          level: null,
-          province_id: null,
-          ward_id: null,
-          school_id: null,
-          email: email,
-          password: password,
-          phone: null,
-          status: 1,
-          role: 'admin',
-          created_at: new Date()
-        };
-      }
-
-      if (userData) {
-        const accessToken = generateAccessToken(userData);
-        const refreshToken = generateRefreshToken(userData);
-
-        res.cookie('refreshToken', refreshToken, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          maxAge: 7 * 24 * 60 * 60 * 1000
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          message: 'Email hoặc mật khẩu không chính xác'
         });
-
-        const response: ApiResponse<{ accessToken: string; user: UserInterface }> = {
-          success: true,
-          message: 'Đăng nhập thành công',
-          data: {
-            accessToken,
-            user: userData
-          }
-        };
-
-        res.status(200).json(response);
         return;
       }
 
-      const failResponse: ApiResponse = {
-        success: false,
-        message: 'Email hoặc mật khẩu không chính xác'
-      };
-      res.status(401).json(failResponse);
+      // 2. Bắt buộc kiểm tra mật khẩu bằng bcrypt.compare
+      // Hỗ trợ fallback cho mật khẩu plaintext cũ nếu cần, nhưng ưu tiên bcrypt
+      let isMatch = false;
+      if (user.password && user.password.startsWith('$2b$')) {
+        isMatch = await bcrypt.compare(password, user.password);
+      } else {
+        // Nếu DB vẫn còn mật khẩu chưa hash (giai đoạn chuyển đổi), so sánh trực tiếp
+        isMatch = user.password === password;
+      }
+
+      if (!isMatch) {
+        res.status(401).json({
+          success: false,
+          message: 'Email hoặc mật khẩu không chính xác'
+        });
+        return;
+      }
+
+      // 3. Tạo Token và trả về phản hồi thành công
+      const accessToken = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Đăng nhập thành công',
+        data: {
+          accessToken,
+          user
+        }
+      });
 
     } catch (error: unknown) {
       console.error('Login error:', error);
@@ -165,6 +156,55 @@ const authController = {
     });
     const response: ApiResponse = { success: true, message: 'Đã đăng xuất' };
     res.status(200).json(response);
+  },
+
+  /**
+   * Đổi mật khẩu
+   */
+  changePassword: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { oldPassword, newPassword } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+        return;
+      }
+
+      const user = await User.getById(userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+        return;
+      }
+
+      // Kiểm tra mật khẩu cũ
+      // Lưu ý: Nếu DB đang lưu plaintext (như testitdn), cần handle cả 2 trường hợp
+      let isMatch = false;
+      if (user.password && user.password.startsWith('$2b$')) {
+        // Mật khẩu đã được mã hóa bcrypt
+        isMatch = await bcrypt.compare(oldPassword, user.password);
+      } else {
+        // Mật khẩu plaintext (cho các acc cũ/test)
+        isMatch = user.password === oldPassword;
+      }
+
+      if (!isMatch) {
+        res.status(400).json({ success: false, message: 'Mật khẩu cũ không chính xác' });
+        return;
+      }
+
+      // Mã hóa mật khẩu mới
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      // Cập nhật vào DB
+      await User.updatePassword(userId, hashedPassword);
+
+      res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công' });
+    } catch (error: any) {
+      console.error('Change password error:', error);
+      res.status(500).json({ success: false, message: 'Lỗi server khi đổi mật khẩu', error: error.message });
+    }
   }
 };
 

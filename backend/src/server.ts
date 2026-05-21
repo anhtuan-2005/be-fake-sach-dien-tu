@@ -8,11 +8,17 @@ import userRoutes from './routes/userRoutes';
 import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import bookRoutes from './routes/bookRoutes';
+import profileRoutes from './routes/profile.route';
 import { setupLogCleanupJob } from './jobs/logCleanup';
+
+import path from 'path';
 
 dotenv.config();
 
 const app: Application = express();
+
+// Phục vụ các file tĩnh từ thư mục uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Sử dụng port từ Render cấp hoặc mặc định là 10000 nếu chạy local
 const PORT: string | number = process.env.PORT || 10000;
@@ -50,6 +56,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/books', bookRoutes);
+app.use('/api', profileRoutes); // New 4-layer architecture routes for Profile
 
 // Test route
 app.get('/', (req: Request, res: Response) => {

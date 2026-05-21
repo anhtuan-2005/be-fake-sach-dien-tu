@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import userController from '../controllers/userController';
 import { verifyToken } from '../middleware/authMiddleware';
+import { uploadAvatar } from '../middleware/uploadMiddleware';
 
 const router: Router = express.Router();
 

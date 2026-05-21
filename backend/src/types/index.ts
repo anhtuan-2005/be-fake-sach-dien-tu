@@ -16,6 +16,7 @@ export interface User {
   phone: string | null;
   status: number; // tinyint(1) trong SQL trả về number (0 hoặc 1)
   role: string;
+  avatar_url?: string | null;
   created_at: Date;
 }
 

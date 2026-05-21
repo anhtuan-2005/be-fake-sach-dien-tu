@@ -319,6 +319,89 @@ const userController = {
       
       res.status(500).json(response);
     }
+  },
+
+  /**
+   * Cập nhật thông tin cá nhân người dùng
+   */
+  updateProfile: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id: idParam } = req.params;
+      const id = parseInt(idParam as string);
+      let userData = req.body;
+
+      if (isNaN(id)) {
+        res.status(400).json({ success: false, message: 'ID không hợp lệ' });
+        return;
+      }
+
+      // Kiểm tra quyền: Chỉ admin hoặc chính người dùng đó mới được sửa
+      if (req.user?.role !== 'Admin' && req.user?.id !== id) {
+        res.status(403).json({ success: false, message: 'Bạn không có quyền thực hiện hành động này' });
+        return;
+      }
+
+      // Mapping role từ FE sang account_type của DB nếu có
+      if (userData.role) {
+        userData.account_type = userData.role === 'admin' ? 'Admin' : 
+                                userData.role === 'user' ? 'Học sinh' : userData.role;
+      }
+
+      const success = await User.update(id, userData);
+
+      if (success) {
+        const updatedUser = await User.getById(id);
+        res.status(200).json({
+          success: true,
+          message: 'Cập nhật thông tin thành công',
+          data: updatedUser
+        });
+      } else {
+        res.status(404).json({ success: false, message: 'Không tìm thấy người dùng hoặc không có thay đổi' });
+      }
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật thông tin', error: error.message });
+    }
+  },
+
+  /**
+   * Upload ảnh đại diện
+   */
+  uploadAvatar: async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
+        return;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'Không tìm thấy thông tin người dùng' });
+        return;
+      }
+
+      // Tạo URL của ảnh
+      // Lưu ý: Trong thực tế bạn nên dùng biến môi trường cho BASE_URL
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const avatarUrl = `${protocol}://${host}/uploads/avatars/${req.file.filename}`;
+
+      // Cập nhật vào DB
+      const user = await User.getById(userId);
+      if (user) {
+        await User.update(userId, { ...user, avatar_url: avatarUrl });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Tải ảnh lên thành công',
+        data: { url: avatarUrl }
+      });
+    } catch (error: any) {
+      console.error('Upload avatar error:', error);
+      res.status(500).json({ success: false, message: 'Lỗi server khi tải ảnh lên', error: error.message });
+    }
   }
 };
 

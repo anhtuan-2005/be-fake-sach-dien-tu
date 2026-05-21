@@ -159,14 +159,41 @@ const User = {
    */
   update: async (id: number, userData: Partial<UserInterface>): Promise<boolean> => {
     try {
-      const { full_name, email, phone, account_type, level, user_code } = userData;
+      const oldUser = await User.getById(id);
+      if (!oldUser) return false;
+
+      // Hợp nhất dữ liệu cũ và mới để tránh mất dữ liệu hoặc lỗi NULL
+      const full_name = userData.full_name !== undefined ? userData.full_name : oldUser.full_name;
+      const email = userData.email !== undefined ? userData.email : oldUser.email;
+      const phone = userData.phone !== undefined ? userData.phone : oldUser.phone;
+      const account_type = userData.account_type !== undefined ? userData.account_type : oldUser.account_type;
+      const level = userData.level !== undefined ? userData.level : oldUser.level;
+      const user_code = userData.user_code !== undefined ? userData.user_code : oldUser.user_code;
+      const avatar_url = userData.avatar_url !== undefined ? userData.avatar_url : oldUser.avatar_url;
+
       const [result] = await db.query<any>(
-        'UPDATE users SET full_name = ?, email = ?, phone = ?, account_type = ?, level = ?, user_code = ? WHERE id = ?',
-        [full_name, email, phone, account_type, level, user_code, id]
+        'UPDATE users SET full_name = ?, email = ?, phone = ?, account_type = ?, level = ?, user_code = ?, avatar_url = ? WHERE id = ?',
+        [full_name, email, phone, account_type, level, user_code, avatar_url, id]
       );
       return result.affectedRows > 0;
     } catch (error: unknown) {
       console.error('>>> UserModel Update Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cập nhật mật khẩu người dùng
+   */
+  updatePassword: async (id: number, passwordHash: string): Promise<boolean> => {
+    try {
+      const [result] = await db.query<any>(
+        'UPDATE users SET password = ? WHERE id = ?',
+        [passwordHash, id]
+      );
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      console.error('>>> UserModel UpdatePassword Error:', error);
       throw error;
     }
   },
