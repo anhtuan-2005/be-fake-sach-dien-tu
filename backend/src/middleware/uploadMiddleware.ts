@@ -6,18 +6,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Kiểm tra biến môi trường
-if (!process.env.CLOUDINARY_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.error('❌ CRITICAL ERROR: Cloudinary environment variables are missing!');
+// Chấp nhận cả CLOUDINARY_NAME hoặc CLOUDINARY_CLOUD_NAME
+const cloudName = process.env.CLOUDINARY_NAME || process.env.CLOUDINARY_CLOUD_NAME;
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+// Kiểm tra chi tiết biến môi trường
+const missingKeys = [];
+if (!cloudName) missingKeys.push('CLOUDINARY_NAME (hoặc CLOUDINARY_CLOUD_NAME)');
+if (!apiKey) missingKeys.push('CLOUDINARY_API_KEY');
+if (!apiSecret) missingKeys.push('CLOUDINARY_API_SECRET');
+
+if (missingKeys.length > 0) {
+  console.error(`❌ CRITICAL ERROR: Missing Cloudinary keys: ${missingKeys.join(', ')}`);
 } else {
-  console.log('✅ Cloudinary environment variables loaded');
+  console.log('✅ Cloudinary environment variables loaded successfully');
 }
 
 // Cấu hình Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: cloudName,
+  api_key: apiKey,
+  api_secret: apiSecret
 });
 
 // Cấu hình Cloudinary Storage cho Multer
