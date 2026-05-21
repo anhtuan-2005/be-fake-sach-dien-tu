@@ -5,15 +5,6 @@ import { JWTPayload } from '../types';
 
 dotenv.config();
 
-// Declaration Merging để mở rộng kiểu Request của Express toàn cục
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-    }
-  }
-}
-
 // Giữ lại AuthRequest để không làm gãy các code cũ đang import nó
 export interface AuthRequest extends Request {
   user?: JWTPayload;
