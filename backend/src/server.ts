@@ -69,7 +69,8 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Có lỗi xảy ra trên server!',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    error_detail: err.toString(), // Luôn trả về chi tiết lỗi để debug trên Render
+    stack: err.stack
   });
 });
 

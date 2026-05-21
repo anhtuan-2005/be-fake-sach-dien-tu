@@ -49,15 +49,23 @@ export class ProfileController {
    */
   static async uploadAvatar(req: Request, res: Response): Promise<void> {
     try {
+      console.log('>>> uploadAvatar Controller: Processing request');
       // req.user được gán từ authMiddleware
       const userId = req.user?.id;
       
       if (!userId) {
+        console.error('>>> uploadAvatar Error: No userId found in request');
         res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
         return;
       }
       
       const file = (req as any).file;
+      console.log('>>> uploadAvatar File info:', file ? {
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        path: file.path,
+        cloudinaryUrl: (file as any).cloudinaryUrl
+      } : 'No file received');
       
       if (!file) {
         res.status(400).json({ success: false, message: 'Vui lòng chọn ảnh để tải lên' });

@@ -24,21 +24,23 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req: Request, file: any) => {
+    console.log('>>> CloudinaryStorage: Preparing params for file:', file.originalname);
     return {
       folder: 'avatars',
       allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
       public_id: `avatar-${Date.now()}`
     };
   },
-} as any); // Sử dụng ép kiểu any để tránh lỗi type mapping của thư viện
+} as any);
 
 // Bộ lọc file
 const fileFilter = (req: Request, file: any, cb: any) => {
-  console.log('>>> Multer processing file:', file.originalname, 'type:', file.mimetype);
+  console.log('>>> Multer fileFilter: processing file:', file.originalname, 'mimetype:', file.mimetype);
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
+    console.error('>>> Multer fileFilter Error: Invalid file type:', file.mimetype);
     cb(new Error('Chỉ chấp nhận file ảnh (JPG, PNG, WEBP)'), false);
   }
 };
