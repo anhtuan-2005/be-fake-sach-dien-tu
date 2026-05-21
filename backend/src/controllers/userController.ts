@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import User from '../models/userModel';
 import { ApiResponse, User as UserInterface } from '../types';
 import { createActivityLog } from '../utils/logger';
+import multer from 'multer';
 
 /**
  * Controller quản lý các logic nghiệp vụ liên quan đến người dùng
@@ -370,7 +371,9 @@ const userController = {
    */
   uploadAvatar: async (req: Request, res: Response): Promise<void> => {
     try {
-      if (!req.file) {
+      const file = req.file as Express.Multer.File;
+
+      if (!file) {
         res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
         return;
       }
@@ -385,7 +388,7 @@ const userController = {
       // Lưu ý: Trong thực tế bạn nên dùng biến môi trường cho BASE_URL
       const protocol = req.protocol;
       const host = req.get('host');
-      const avatarUrl = `${protocol}://${host}/uploads/avatars/${req.file.filename}`;
+      const avatarUrl = `${protocol}://${host}/uploads/avatars/${file.filename}`;
 
       // Cập nhật vào DB
       const user = await User.getById(userId);

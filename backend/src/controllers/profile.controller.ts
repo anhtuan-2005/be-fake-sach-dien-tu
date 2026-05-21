@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ProfileService } from '../services/profile.service';
+import multer from 'multer';
 import { 
   validateUpdateProfile, 
   validateChangePassword, 
@@ -57,12 +58,14 @@ export class ProfileController {
         return;
       }
       
-      if (!req.file) {
+      const file = req.file as Express.Multer.File;
+      
+      if (!file) {
         res.status(400).json({ success: false, message: 'Vui lòng chọn ảnh để tải lên' });
         return;
       }
 
-      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const avatarUrl = `/uploads/avatars/${file.filename}`;
       
       const success = await ProfileService.updateAvatar(userId, avatarUrl);
       
