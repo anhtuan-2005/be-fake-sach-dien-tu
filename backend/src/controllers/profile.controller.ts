@@ -64,7 +64,8 @@ export class ProfileController {
         return;
       }
 
-      const avatarUrl = `/uploads/avatars/${file.filename}`;
+      // Khi sử dụng Cloudinary, URL sẽ nằm trong file.path hoặc file.cloudinaryUrl
+      const avatarUrl = file.path || (file as any).cloudinaryUrl;
       
       const success = await ProfileService.updateAvatar(userId, avatarUrl);
       

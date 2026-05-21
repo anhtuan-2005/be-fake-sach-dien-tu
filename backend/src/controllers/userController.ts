@@ -383,11 +383,8 @@ const userController = {
         return;
       }
 
-      // Tạo URL của ảnh
-      // Lưu ý: Trong thực tế bạn nên dùng biến môi trường cho BASE_URL
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const avatarUrl = `${protocol}://${host}/uploads/avatars/${file.filename}`;
+      // Khi sử dụng Cloudinary, URL sẽ nằm trong file.path hoặc file.cloudinaryUrl
+      const avatarUrl = file.path || (file as any).cloudinaryUrl;
 
       // Cập nhật vào DB
       const user = await User.getById(userId);
