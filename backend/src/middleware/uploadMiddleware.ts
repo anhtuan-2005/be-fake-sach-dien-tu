@@ -6,6 +6,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Kiểm tra biến môi trường
+if (!process.env.CLOUDINARY_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.error('❌ CRITICAL ERROR: Cloudinary environment variables are missing!');
+} else {
+  console.log('✅ Cloudinary environment variables loaded');
+}
+
 // Cấu hình Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
@@ -18,15 +25,16 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req: Request, file: any) => {
     return {
-      folder: 'avatars', // Thư mục lưu trữ trên Cloudinary
+      folder: 'avatars',
       allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
-      public_id: `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+      public_id: `avatar-${Date.now()}`
     };
   },
-});
+} as any); // Sử dụng ép kiểu any để tránh lỗi type mapping của thư viện
 
-// Bộ lọc file (vẫn giữ lại để kiểm tra mime type trước khi upload)
+// Bộ lọc file
 const fileFilter = (req: Request, file: any, cb: any) => {
+  console.log('>>> Multer processing file:', file.originalname, 'type:', file.mimetype);
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);

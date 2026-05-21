@@ -63,10 +63,14 @@ app.get('/', (req: Request, res: Response) => {
   res.send('API Backend của Tuấn Anh đang chạy thành công rực rỡ (TypeScript version)!');
 });
 
-// Error handling middleware (optional but good practice)
+// Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).send('Có lỗi xảy ra!');
+  console.error('>>> GLOBAL ERROR:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Có lỗi xảy ra trên server!',
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 // Quan trọng: Thêm '0.0.0.0' để Render có thể bind vào cổng thành công
