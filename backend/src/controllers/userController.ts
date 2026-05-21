@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import User from '../models/userModel';
 import { ApiResponse, User as UserInterface } from '../types';
 import { createActivityLog } from '../utils/logger';
-import multer from 'multer';
 
 /**
  * Controller quản lý các logic nghiệp vụ liên quan đến người dùng
@@ -371,7 +370,7 @@ const userController = {
    */
   uploadAvatar: async (req: Request, res: Response): Promise<void> => {
     try {
-      const file = req.file as Express.Multer.File;
+      const file = (req as any).file;
 
       if (!file) {
         res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });

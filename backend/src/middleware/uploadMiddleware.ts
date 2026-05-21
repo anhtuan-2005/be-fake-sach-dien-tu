@@ -1,4 +1,4 @@
-import multer, { FileFilterCallback } from 'multer';
+import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { Request } from 'express';
@@ -11,10 +11,10 @@ if (!fs.existsSync(uploadDir)) {
 
 // Cấu hình lưu trữ
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+  destination: (req: Request, file: any, cb: any) => {
     cb(null, uploadDir);
   },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+  filename: (req: Request, file: any, cb: any) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     cb(null, `avatar-${uniqueSuffix}${ext}`);
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 });
 
 // Bộ lọc file
-const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+const fileFilter = (req: Request, file: any, cb: any) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
