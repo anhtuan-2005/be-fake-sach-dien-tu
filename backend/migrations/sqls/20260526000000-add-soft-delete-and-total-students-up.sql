@@ -1,0 +1,11 @@
+ALTER TABLE users ADD COLUMN is_deleted TINYINT DEFAULT 0;
+ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL;
+ALTER TABLE classes ADD COLUMN total_students INT DEFAULT 0;
+
+-- Đồng bộ sĩ số hiện tại cho các lớp học
+UPDATE classes c SET total_students = (
+    SELECT COUNT(*) 
+    FROM student_classes sc 
+    JOIN users u ON sc.student_id = u.id 
+    WHERE sc.class_id = c.id AND sc.status = 1 AND u.deleted_at IS NULL
+);

@@ -34,6 +34,21 @@ export interface Book {
   created_at: Date;
 }
 
+export interface Classroom {
+  id: number;
+  class_code: string;
+  class_name: string;
+  description: string | null;
+  status: number; // 1: Đang dùng, 0: Ngừng sử dụng
+  completion_status: number; // 0: Đang học, 1: Hoàn thành
+  teacher_id?: number | null; // ID của giáo viên chủ nhiệm
+  teacher_name?: string | null; // Tên giáo viên (lấy từ JOIN)
+  teacher_email?: string | null; // Email giáo viên
+  teacher_phone?: string | null; // SĐT giáo viên
+  student_count?: number; // Đếm động từ bảng student_classes
+  created_at: Date;
+}
+
 /**
  * Interface cho Danh mục
  */
@@ -75,7 +90,7 @@ export interface ActivityLog {
   id: number;
   user_id: number | null;
   user_email: string | null;
-  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE';
+  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'HARD_DELETE';
   target_user_id: number | null;
   description: string;
   old_values: any | null;
@@ -90,7 +105,7 @@ export interface ActivityLog {
 export interface LogInput {
   userId?: number;
   userEmail?: string;
-  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE';
+  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'HARD_DELETE';
   targetUserId?: number;
   description: string;
   oldValues?: any;

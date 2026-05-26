@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import { ProfileService } from '../services/profile.service';
+import { deleteOldAvatar } from '../utils/fileHelper';
 import { 
   validateUpdateProfile, 
   validateChangePassword, 
   UpdateProfileDto, 
   ChangePasswordDto 
 } from '../dtos/profile.dto';
+import { UserModel } from '../models/user.model';
 
 /**
  * Controller tiếp nhận Request và điều phối Service
@@ -74,6 +76,13 @@ export class ProfileController {
 
       // Khi sử dụng Cloudinary, URL sẽ nằm trong file.path hoặc file.cloudinaryUrl
       const avatarUrl = file.path || (file as any).cloudinaryUrl;
+      
+      // 1. Lấy thông tin user hiện tại để tìm avatar cũ
+      const user = await UserModel.findUserById(userId);
+      if (user && user.avatar_url) {
+        // 2. Xóa ảnh cũ
+        await deleteOldAvatar(user.avatar_url);
+      }
       
       const success = await ProfileService.updateAvatar(userId, avatarUrl);
       

@@ -33,9 +33,19 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): an
     next();
   } catch (error: any) {
     console.error('[Auth] JWT Verify Error:', error.message);
+    
+    // Phân biệt lỗi hết hạn để Frontend dễ xử lý Silent Refresh
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'TOKEN_EXPIRED',
+        error: 'Access token đã hết hạn'
+      });
+    }
+
     return res.status(403).json({
       success: false,
-      message: 'Token không hợp lệ hoặc đã hết hạn.'
+      message: 'Token không hợp lệ.'
     });
   }
 };

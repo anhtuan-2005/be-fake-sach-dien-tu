@@ -1,6 +1,7 @@
 import db from '../config/db';
 import { User as UserInterface } from '../types';
 import { RowDataPacket } from 'mysql2';
+import bcrypt from 'bcrypt';
 
 /**
  * Model quản lý các thao tác với bảng 'users'
@@ -23,13 +24,13 @@ const User = {
   },
 
   /**
-   * Lấy chi tiết một người dùng theo ID
+   * Lấy chi tiết một người dùng theo ID (chỉ lấy người chưa bị xóa mềm)
    * @param {number} id ID của người dùng
    * @returns {Promise<UserInterface | null>} Thông tin người dùng hoặc null
    */
   getById: async (id: number): Promise<UserInterface | null> => {
     try {
-      const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [id]);
+      const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL', [id]);
       const user = rows[0] as UserInterface | undefined;
       return user || null;
     } catch (error: unknown) {
@@ -142,10 +143,20 @@ const User = {
    */
   create: async (userData: Partial<UserInterface>): Promise<number> => {
     try {
-      const { full_name, email, phone, account_type, level, user_code, password } = userData;
+      const { full_name, email, phone, account_type, level, user_code, password, role } = userData;
+      
+      // Băm mật khẩu trước khi lưu
+      let passwordHash = password;
+      if (password) {
+        passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      // Đảm bảo role được lưu đồng bộ với account_type
+      const dbRole = role || (account_type === 'Admin' ? 'admin' : account_type === 'Giáo viên' ? 'teacher' : 'student');
+
       const [result] = await db.query<any>(
-        'INSERT INTO users (full_name, email, phone, account_type, level, user_code, password, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
-        [full_name, email, phone, account_type, level, user_code, password]
+        'INSERT INTO users (full_name, email, phone, account_type, `level`, user_code, password, `role`, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+        [full_name, email, phone, account_type, level, user_code, passwordHash, dbRole]
       );
       return result.insertId;
     } catch (error: unknown) {
@@ -170,10 +181,12 @@ const User = {
       const level = userData.level !== undefined ? userData.level : oldUser.level;
       const user_code = userData.user_code !== undefined ? userData.user_code : oldUser.user_code;
       const avatar_url = userData.avatar_url !== undefined ? userData.avatar_url : oldUser.avatar_url;
+      const role = userData.role !== undefined ? userData.role : 
+                   (userData.account_type ? (userData.account_type === 'Admin' ? 'admin' : userData.account_type === 'Giáo viên' ? 'teacher' : 'student') : oldUser.role);
 
       const [result] = await db.query<any>(
-        'UPDATE users SET full_name = ?, email = ?, phone = ?, account_type = ?, level = ?, user_code = ?, avatar_url = ? WHERE id = ?',
-        [full_name, email, phone, account_type, level, user_code, avatar_url, id]
+        'UPDATE users SET full_name = ?, email = ?, phone = ?, account_type = ?, `level` = ?, user_code = ?, avatar_url = ?, `role` = ? WHERE id = ?',
+        [full_name, email, phone, account_type, level, user_code, avatar_url, role, id]
       );
       return result.affectedRows > 0;
     } catch (error: unknown) {
@@ -204,7 +217,7 @@ const User = {
   softDelete: async (id: number): Promise<boolean> => {
     try {
       const [result] = await db.query<any>(
-        'UPDATE users SET deleted_at = NOW() WHERE id = ?',
+        'UPDATE users SET deleted_at = NOW(), is_deleted = 1 WHERE id = ?',
         [id]
       );
       return result.affectedRows > 0;
@@ -220,7 +233,7 @@ const User = {
   restore: async (id: number): Promise<boolean> => {
     try {
       const [result] = await db.query<any>(
-        'UPDATE users SET deleted_at = NULL WHERE id = ?',
+        'UPDATE users SET deleted_at = NULL, is_deleted = 0 WHERE id = ?',
         [id]
       );
       return result.affectedRows > 0;
@@ -231,13 +244,29 @@ const User = {
   },
   
   /**
-   * Tìm kiếm người dùng theo email
+   * Xóa vĩnh viễn người dùng (Xóa cứng)
+   */
+  hardDelete: async (id: number): Promise<boolean> => {
+    try {
+      const [result] = await db.query<any>(
+        'DELETE FROM users WHERE id = ?',
+        [id]
+      );
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      console.error('>>> UserModel HardDelete Error:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Tìm kiếm người dùng theo email (chỉ lấy người chưa bị xóa mềm)
    * @param {string} email Email cần tìm
    * @returns {Promise<UserInterface | null>} Thông tin người dùng hoặc null
    */
   findByEmail: async (email: string): Promise<UserInterface | null> => {
     try {
-      const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE email = ?', [email]);
+      const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL', [email]);
       const user = rows[0] as UserInterface | undefined;
       return user || null;
     } catch (error: unknown) {

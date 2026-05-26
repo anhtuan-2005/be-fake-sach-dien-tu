@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import User from '../models/userModel';
+import db from '../config/db';
 import { ApiResponse, User as UserInterface } from '../types';
 import { createActivityLog } from '../utils/logger';
+import { deleteOldAvatar } from '../utils/fileHelper';
 
 /**
  * Controller quản lý các logic nghiệp vụ liên quan đến người dùng
@@ -102,6 +104,20 @@ const userController = {
       });
     } catch (error: any) {
       console.error('>>> userController: Error creating user:', error);
+      
+      // Xử lý lỗi trùng lặp (Duplicate Entry)
+      if (error.code === 'ER_DUP_ENTRY') {
+        let message = 'Dữ liệu bị trùng lặp';
+        if (error.sqlMessage.includes('email')) message = 'Email này đã được sử dụng';
+        if (error.sqlMessage.includes('user_code')) message = 'Mã người dùng này đã tồn tại';
+        
+        res.status(400).json({
+          success: false,
+          message: message
+        });
+        return;
+      }
+
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi tạo người dùng',
@@ -130,7 +146,7 @@ const userController = {
       }
       
       // 2. Thực hiện cập nhật
-      const success = await User.update(id, userData);
+      await User.update(id, userData);
       
       // 3. Ghi log hoạt động (Ghi log ngay cả khi success là false do không có gì thay đổi, 
       // nhưng thực tế User.update trả về true nếu query thành công trong một số trường hợp, 
@@ -164,6 +180,7 @@ const userController = {
    * Xóa mềm người dùng
    */
   softDeleteUser: async (req: Request, res: Response): Promise<void> => {
+    const connection = await db.getConnection();
     try {
       const { id } = req.params;
       const userId = parseInt(id as string);
@@ -195,9 +212,35 @@ const userController = {
         return;
       }
 
+      // BẮT ĐẦU TRANSACTION
+      await connection.beginTransaction();
+
       // 2. Thực hiện xóa mềm
-      const success = await User.softDelete(userId);
-      if (success) {
+      const [deleteResult]: any = await connection.query(
+        'UPDATE users SET deleted_at = NOW(), is_deleted = 1 WHERE id = ?',
+        [userId]
+      );
+
+      if (deleteResult.affectedRows > 0) {
+        // 2.1. Tìm các lớp học mà học sinh này đang tham gia (chỉ tính các bản ghi đã duyệt status = 1)
+        const [studentClasses]: any = await connection.query(
+          'SELECT class_id FROM student_classes WHERE student_id = ? AND status = 1',
+          [userId]
+        );
+
+        if (studentClasses.length > 0) {
+          const classIds = studentClasses.map((sc: any) => sc.class_id);
+          
+          // 2.2. Giảm sĩ số total_students cho các lớp học đó
+          await connection.query(
+            'UPDATE classes SET total_students = total_students - 1 WHERE id IN (?)',
+            [classIds]
+          );
+        }
+
+        // COMMIT TRANSACTION
+        await connection.commit();
+
         // 3. Ghi log hoạt động
         await createActivityLog({
           userId: req.user?.id,
@@ -211,43 +254,75 @@ const userController = {
 
         res.status(200).json({
           success: true,
-          message: 'Đã chuyển người dùng vào thùng rác'
+          message: 'Đã chuyển người dùng vào thùng rác và cập nhật sĩ số lớp học'
         });
       } else {
+        await connection.rollback();
         res.status(500).json({
           success: false,
           message: 'Lỗi khi xóa người dùng'
         });
       }
     } catch (error: any) {
+      await connection.rollback();
       console.error('>>> userController: Error soft deleting user:', error);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi xóa người dùng',
         error: error.message
       });
+    } finally {
+      connection.release();
     }
   },
 
   /**
-   * Khôi phục người dùng
+   * Khôi phục người dùng (Chuyển sang PUT)
    */
   restoreUser: async (req: Request, res: Response): Promise<void> => {
+    const connection = await db.getConnection();
     try {
       const { id } = req.params;
       const userId = parseInt(id as string);
       
-      const success = await User.restore(userId);
+      // BẮT ĐẦU TRANSACTION
+      await connection.beginTransaction();
+
+      // 1. Thực hiện khôi phục
+      const [restoreResult]: any = await connection.query(
+        'UPDATE users SET deleted_at = NULL, is_deleted = 0 WHERE id = ?',
+        [userId]
+      );
       
-      if (success) {
-        // Lấy lại data sau khi khôi phục để ghi log
-        const restoredUser = await User.getById(userId);
+      if (restoreResult.affectedRows > 0) {
+        // 2. Tìm các lớp học mà học sinh này đang tham gia (chỉ tính các bản ghi đã duyệt status = 1)
+        const [studentClasses]: any = await connection.query(
+          'SELECT class_id FROM student_classes WHERE student_id = ? AND status = 1',
+          [userId]
+        );
+
+        if (studentClasses.length > 0) {
+          const classIds = studentClasses.map((sc: any) => sc.class_id);
+          
+          // 3. Tăng lại sĩ số total_students cho các lớp học đó
+          await connection.query(
+            'UPDATE classes SET total_students = total_students + 1 WHERE id IN (?)',
+            [classIds]
+          );
+        }
+
+        // COMMIT TRANSACTION
+        await connection.commit();
+
+        // Lấy lại data (bao gồm cả người đã xóa) để ghi log
+        const [rows]: any = await connection.query('SELECT * FROM users WHERE id = ?', [userId]);
+        const restoredUser = rows[0];
         
         // Ghi log hoạt động
         await createActivityLog({
           userId: req.user?.id,
           userEmail: req.user?.email,
-          action: 'UPDATE', // Khôi phục cũng là một dạng update trạng thái
+          action: 'RESTORE',
           targetUserId: userId,
           description: `Khôi phục người dùng: ${restoredUser?.full_name || id}`,
           newValues: restoredUser,
@@ -256,21 +331,109 @@ const userController = {
 
         res.status(200).json({
           success: true,
-          message: 'Khôi phục người dùng thành công'
+          message: 'Khôi phục người dùng thành công và cập nhật sĩ số lớp học'
         });
       } else {
+        await connection.rollback();
         res.status(404).json({
           success: false,
           message: 'Không tìm thấy người dùng'
         });
       }
     } catch (error: any) {
+      await connection.rollback();
       console.error('>>> userController: Error restoring user:', error);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi khôi phục người dùng',
         error: error.message
       });
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Xóa vĩnh viễn người dùng (Xóa cứng)
+   */
+  hardDeleteUser: async (req: Request, res: Response): Promise<void> => {
+    const connection = await db.getConnection();
+    try {
+      const { id } = req.params;
+      const userId = parseInt(id as string);
+
+      // 1. Kiểm tra tồn tại (Lấy cả người đã xóa mềm)
+      const [rows]: any = await connection.query('SELECT * FROM users WHERE id = ?', [userId]);
+      const oldUser = rows[0];
+
+      if (!oldUser) {
+        res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng để xóa vĩnh viễn'
+        });
+        return;
+      }
+
+      // BẮT ĐẦU TRANSACTION
+      await connection.beginTransaction();
+
+      // 2. Tìm các lớp học mà người dùng này đang tham gia (đã duyệt) TRƯỚC khi xóa
+      // Nếu người dùng đang bị xóa mềm (is_deleted = 1), thì sĩ số đã giảm rồi, không cần giảm nữa.
+      // Nếu người dùng chưa bị xóa mềm (is_deleted = 0), thì cần giảm sĩ số.
+      if (oldUser.is_deleted === 0) {
+        const [studentClasses]: any = await connection.query(
+          'SELECT class_id FROM student_classes WHERE student_id = ? AND status = 1',
+          [userId]
+        );
+
+        if (studentClasses.length > 0) {
+          const classIds = studentClasses.map((sc: any) => sc.class_id);
+          await connection.query(
+            'UPDATE classes SET total_students = total_students - 1 WHERE id IN (?)',
+            [classIds]
+          );
+        }
+      }
+
+      // 3. Thực hiện xóa vĩnh viễn
+      const [result]: any = await connection.query('DELETE FROM users WHERE id = ?', [userId]);
+      
+      if (result.affectedRows > 0) {
+        // COMMIT TRANSACTION
+        await connection.commit();
+
+        // 4. Ghi log hoạt động
+        await createActivityLog({
+          userId: req.user?.id,
+          userEmail: req.user?.email,
+          action: 'HARD_DELETE',
+          targetUserId: userId,
+          description: `Xóa vĩnh viễn người dùng: ${oldUser.full_name}`,
+          oldValues: oldUser,
+          ipAddress: req.ip
+        });
+
+        res.status(200).json({
+          success: true,
+          message: 'Đã xóa vĩnh viễn người dùng khỏi hệ thống và cập nhật sĩ số lớp học'
+        });
+      } else {
+        await connection.rollback();
+        res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa vĩnh viễn người dùng'
+        });
+      }
+    } catch (error: any) {
+      await connection.rollback();
+      console.error('>>> userController: Error hard deleting user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi xóa vĩnh viễn người dùng',
+        error: error.message
+      });
+    } finally {
+      connection.release();
     }
   },
 
@@ -389,6 +552,10 @@ const userController = {
       // Cập nhật vào DB
       const user = await User.getById(userId);
       if (user) {
+        // Xóa ảnh cũ trước khi cập nhật ảnh mới (Tránh đầy bộ nhớ/Cloudinary)
+        if (user.avatar_url) {
+          await deleteOldAvatar(user.avatar_url);
+        }
         await User.update(userId, { ...user, avatar_url: avatarUrl });
       }
 

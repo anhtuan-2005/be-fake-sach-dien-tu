@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/userModel';
+import db from '../config/db';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
@@ -44,13 +45,24 @@ const authController = {
     const { email, password }: LoginDto = req.body;
 
     try {
-      // 1. Tìm kiếm user trong database theo email
-      const user = await User.findByEmail(email);
+      // 1. Tìm kiếm user trong database theo email (Lấy cả người đã xóa để kiểm tra trạng thái)
+      // Sử dụng query trực tiếp để tránh bị UserModel filter deleted_at
+      const [rows]: any = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+      const user = rows[0];
       
       if (!user) {
         res.status(401).json({
           success: false,
           message: 'Email hoặc mật khẩu không chính xác'
+        });
+        return;
+      }
+
+      // KIỂM TRA TRẠNG THÁI XÓA MỀM
+      if (user.deleted_at) {
+        res.status(403).json({
+          success: false,
+          message: 'Tài khoản của bạn đã bị khóa hoặc không còn tồn tại trên hệ thống.'
         });
         return;
       }
