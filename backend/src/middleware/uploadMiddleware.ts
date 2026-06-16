@@ -62,3 +62,40 @@ export const uploadAvatar = multer({
     fileSize: 2 * 1024 * 1024 // 2MB
   }
 });
+
+// --- CẤU HÌNH UPLOAD PHƯƠNG TIỆN CHO CÂU HỎI ---
+
+const questionStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req: Request, file: any) => {
+    console.log('>>> CloudinaryStorage (Question): Preparing params for file:', file.originalname);
+    const isAudio = file.mimetype.startsWith('audio/');
+    return {
+      folder: 'questions',
+      resource_type: isAudio ? 'video' : 'image', // Cloudinary requires 'video' for audio files
+      public_id: `media-${Date.now()}-${Math.round(Math.random() * 1e4)}`
+    };
+  },
+} as any);
+
+const questionFileFilter = (req: Request, file: any, cb: any) => {
+  console.log('>>> Multer questionFileFilter: processing file:', file.originalname, 'mimetype:', file.mimetype);
+  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const allowedAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/m4a', 'audio/ogg'];
+  
+  if (allowedImageTypes.includes(file.mimetype) || allowedAudioTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    console.error('>>> Multer questionFileFilter Error: Invalid file type:', file.mimetype);
+    cb(new Error('Chỉ chấp nhận file ảnh (JPG, PNG, WEBP, GIF) hoặc âm thanh (MP3, WAV, M4A, OGG)'), false);
+  }
+};
+
+export const uploadQuestionMedia = multer({
+  storage: questionStorage as any,
+  fileFilter: questionFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  }
+});
+

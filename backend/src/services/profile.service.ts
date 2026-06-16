@@ -10,7 +10,27 @@ export class ProfileService {
   /**
    * Cập nhật thông tin cơ bản
    */
-  static async updateProfile(userId: number, data: UpdateProfileDto): Promise<UserInterface | null> {
+  static async updateProfile(userId: number, data: UpdateProfileDto, userRole: string): Promise<UserInterface | null> {
+    // 1. Lấy thông tin user hiện tại để đối chiếu
+    const existingUser = await UserModel.findUserById(userId);
+    if (!existingUser) return null;
+
+    // 2. Nếu req.user.role === 'teacher' mà dữ liệu gửi lên (req.body.level) có sự thay đổi so với dữ liệu cũ trong DB, lập tức từ chối
+    if (userRole && userRole.toLowerCase() === 'teacher') {
+      if (data.level !== undefined && data.level !== existingUser.level) {
+        const error: any = new Error('Giáo viên không có quyền chỉnh sửa thông tin Tổ bộ môn');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+
+    // 3. Nếu là Admin và chọn giá trị level là "N/A" (hoặc null), tự động gán NULL
+    if (userRole && userRole.toLowerCase() === 'admin') {
+      if (data.level === 'N/A' || data.level === null) {
+        data.level = null;
+      }
+    }
+
     const success = await UserModel.updateUserProfile(userId, data);
     if (!success) return null;
     return await UserModel.findUserById(userId);

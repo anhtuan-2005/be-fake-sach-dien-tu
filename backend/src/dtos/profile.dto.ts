@@ -7,6 +7,7 @@ export interface UpdateProfileDto {
   full_name?: string;
   email?: string;
   phone?: string;
+  level?: string | null;
   // Có thể thêm các trường khác nếu cần
 }
 

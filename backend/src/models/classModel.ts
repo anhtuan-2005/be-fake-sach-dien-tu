@@ -14,10 +14,16 @@ const ClassroomModel = {
       let baseQuery = ' FROM classes WHERE 1=1';
       const queryParams: any[] = [];
 
+      // Lọc theo teacher_id (cho Giáo viên)
+      if (filters.teacher_id !== undefined) {
+        baseQuery += ' AND teacher_id = ?';
+        queryParams.push(filters.teacher_id);
+      }
+
       // 1. Lọc theo trạng thái
       if (filters.status && filters.status !== 'Tất cả') {
         baseQuery += ' AND status = ?';
-        queryParams.push(filters.status === 'Đang dùng' ? 1 : 0);
+        queryParams.push(filters.status === 'Đang dùng' || filters.status === 'Đang hoạt động' || filters.status === 1 ? 1 : 0);
       }
 
       // 2. Lọc theo mã lớp (nếu có dropdown chọn loại search)

@@ -11,11 +11,16 @@ const classController = {
     try {
       const { status, searchType, keyword, page, limit } = req.query;
 
-      const filters = {
+      const filters: any = {
         status: status as string,
         searchType: searchType as string,
         keyword: keyword as string
       };
+
+      // Phân quyền cho Giáo viên: Nếu là giáo viên, chỉ lấy các lớp do chính họ phụ trách
+      if (req.user && req.user.role.toLowerCase() === 'teacher') {
+        filters.teacher_id = req.user.id;
+      }
 
       const currentPage = parseInt(page as string) || 1;
       const pageSize = parseInt(limit as string) || 10;
@@ -50,6 +55,17 @@ const classController = {
   createClass: async (req: Request, res: Response): Promise<void> => {
     try {
       const classData = req.body;
+      
+      // Tự động gán giáo viên nếu là tài khoản role teacher
+      if (req.user && req.user.role.toLowerCase() === 'teacher') {
+        classData.teacher_id = req.user.id;
+      }
+
+      // Tự động sinh mã lớp nếu chưa có
+      if (!classData.class_code) {
+        classData.class_code = 'LH_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      }
+
       const insertId = await classService.createClass(classData);
 
       await createActivityLog({

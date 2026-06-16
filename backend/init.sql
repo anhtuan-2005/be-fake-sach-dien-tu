@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20),
   status TINYINT(1) DEFAULT 1,
   avatar_url VARCHAR(255),
+  role VARCHAR(20) DEFAULT 'student',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (province_id) REFERENCES provinces(id),
   FOREIGN KEY (ward_id) REFERENCES wards(id),
@@ -95,6 +96,20 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   old_values JSON,
   new_values JSON,
   ip_address VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Ngân hàng câu hỏi
+CREATE TABLE IF NOT EXISTS questions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  block_class VARCHAR(50) NOT NULL,
+  unit VARCHAR(100) NOT NULL,
+  skill VARCHAR(100) NOT NULL,
+  question_type VARCHAR(100) NOT NULL,
+  requirement TEXT NOT NULL,
+  content TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  cognitive_level VARCHAR(50) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

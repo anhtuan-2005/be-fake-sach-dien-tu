@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -9,6 +10,10 @@ import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import bookRoutes from './routes/bookRoutes';
 import profileRoutes from './routes/profile.route';
+import questionRoutes from './modules/questions/question.route';
+import teacherRoutes from './routes/teacherRoutes';
+import typeConfigRoutes from './modules/type-configs/typeConfig.route';
+import exerciseTypeRoutes from './modules/exercise-types/exercise-type.route';
 import { setupLogCleanupJob } from './jobs/logCleanup';
 
 import path from 'path';
@@ -55,8 +60,13 @@ setupLogCleanupJob();
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/teacher', teacherRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api', profileRoutes); // New 4-layer architecture routes for Profile
+app.use('/api/questions', questionRoutes); // Question Bank routes
+app.use('/api/type-configs', typeConfigRoutes); // TypeConfig routes
+app.use('/api/exercise-types', exerciseTypeRoutes); // Exercise Type routes
+app.use('/api/exercise_types', exerciseTypeRoutes); // Exercise Type routes (underscore fallback)
 
 // Test route
 app.get('/', (req: Request, res: Response) => {

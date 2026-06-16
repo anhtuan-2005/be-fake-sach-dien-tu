@@ -29,7 +29,8 @@ export class ProfileController {
       }
 
       // 2. Gọi Service
-      const updatedUser = await ProfileService.updateProfile(userId, data);
+      const userRole = req.user?.role || '';
+      const updatedUser = await ProfileService.updateProfile(userId, data, userRole);
       
       if (updatedUser) {
         res.status(200).json({
@@ -42,6 +43,10 @@ export class ProfileController {
       }
     } catch (error: any) {
       console.error('Update Profile Controller Error:', error);
+      if (error.statusCode === 403) {
+        res.status(403).json({ success: false, message: error.message });
+        return;
+      }
       res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật profile' });
     }
   }

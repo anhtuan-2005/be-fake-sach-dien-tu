@@ -34,6 +34,10 @@ export class UserModel {
       fields.push('phone = ?');
       values.push(data.phone);
     }
+    if (data.level !== undefined) {
+      fields.push('level = ?');
+      values.push(data.level);
+    }
     if (data.avatar_url !== undefined) {
       fields.push('avatar_url = ?');
       values.push(data.avatar_url);
