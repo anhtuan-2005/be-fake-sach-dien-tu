@@ -9,7 +9,7 @@ const router = Router();
 
 // Tất cả các route trong Quản lý loại bài tập đều yêu cầu xác thực JWT và quyền 'admin'
 router.use(verifyToken);
-router.use(authorize(['admin']));
+router.use(authorize(['admin', 'teacher']));
 
 // REST endpoints cho Quản lý loại bài tập
 router.get('/', ExerciseTypeController.findAll);

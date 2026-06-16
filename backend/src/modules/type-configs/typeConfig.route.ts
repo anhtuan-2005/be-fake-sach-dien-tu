@@ -9,7 +9,7 @@ const router = Router();
 
 // Tất cả các route quản lý cấu hình thể loại yêu cầu đăng nhập với vai trò 'admin'
 router.use(verifyToken);
-router.use(authorize(['admin']));
+router.use(authorize(['admin', 'teacher']));
 
 // Lấy danh sách cấu hình thể loại
 router.get('/', TypeConfigController.getAllConfigs);
