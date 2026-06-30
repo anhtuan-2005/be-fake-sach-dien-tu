@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import userController from '../controllers/userController';
 import activityLogController from '../controllers/activityLogController';
 import classController from '../controllers/classController';
+import assignmentController from '../controllers/assignmentController';
 import { verifyToken, checkRole } from '../middleware/authMiddleware';
 
 const router: Router = express.Router();
@@ -67,6 +68,28 @@ router.delete('/classes/:id/students', checkRole(['admin', 'teacher']), classCon
 
 // Phê duyệt học sinh vào lớp (Hàng loạt)
 router.put('/classes/:id/students/approve', checkRole(['admin', 'teacher']), classController.approveStudents);
+
+// --- QUẢN LÝ BÀI TẬP TRONG LỚP ---
+// Lấy danh sách bài tập của lớp
+router.get('/classes/:classId/assignments', checkRole(['admin', 'teacher', 'student']), assignmentController.getAssignments);
+
+// Tạo bài tập mới
+router.post('/classes/:classId/assignments', checkRole(['admin', 'teacher']), assignmentController.createAssignment);
+
+// Chi tiết bài tập
+router.get('/assignments/:id', checkRole(['admin', 'teacher', 'student']), assignmentController.getAssignmentById);
+
+// Xóa bài tập
+router.delete('/assignments/:id', checkRole(['admin', 'teacher']), assignmentController.deleteAssignment);
+
+// Cập nhật/Gia hạn bài tập
+router.put('/assignments/:id', checkRole(['admin', 'teacher']), assignmentController.updateAssignment);
+
+// Học sinh lấy danh sách bài tập được giao
+router.get('/student/classes/:classId/assignments', checkRole(['admin', 'teacher', 'student']), assignmentController.getStudentAssignments);
+
+// Học sinh nộp bài tập trắc nghiệm
+router.post('/student/assignments/:assignmentId/submit', checkRole(['student']), assignmentController.submitAssignment);
 
 // --- API DÀNH CHO HỌC SINH (TRONG VIEW ADMIN) ---
 // Lấy danh sách lớp đã tham gia

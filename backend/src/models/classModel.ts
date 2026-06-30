@@ -99,8 +99,8 @@ const ClassroomModel = {
     try {
       const { class_code, class_name, description, status, teacher_id } = classData;
       const [result] = await db.query<any>(
-        'INSERT INTO classes (class_code, class_name, description, status, completion_status, teacher_id, created_at) VALUES (?, ?, ?, ?, 0, ?, NOW())',
-        [class_code, class_name, description || null, status !== undefined ? status : 1, teacher_id || null]
+        'INSERT INTO classes (class_code, class_name, description, status, completion_status, teacher_id, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
+        [class_code, class_name, description || null, status !== undefined ? status : 1, teacher_id || null, new Date()]
       );
       return result.insertId;
     } catch (error: unknown) {
